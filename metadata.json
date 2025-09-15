@@ -1,0 +1,5 @@
+{
+  "name": "Copy of Gemini Novel Reader",
+  "description": "A personal web app to read EPUB novels with an enhanced experience powered by Gemini, featuring chapter summaries, character tracking, and semantic search.",
+  "requestFramePermissions": []
+}
