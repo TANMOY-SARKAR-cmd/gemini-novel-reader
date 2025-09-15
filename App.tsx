@@ -256,22 +256,22 @@ function App() {
     }
   }, [currentNovelId]);
 
-  const handleAddBookmark = useCallback(() => {
+  const handleAddBookmark = useCallback((cfi: string) => {
     const currentNovel = novels.find(n => n.id === currentNovelId);
-    if (!currentNovel || !currentCfi) return;
+    if (!currentNovel || !cfi) return;
 
     const currentChapter = currentNovel.toc?.find(item => item.href === currentChapterHref);
     
     const newBookmark: Bookmark = {
         id: `${currentNovel.id}-${Date.now()}`,
         novelId: currentNovel.id,
-        cfi: currentCfi,
+        cfi: cfi,
         label: currentChapter?.label.trim() ?? 'Bookmark',
         createdAt: Date.now(),
     };
     dbAddBookmark(newBookmark);
     setBookmarks(prev => [newBookmark, ...prev].sort((a,b) => b.createdAt - a.createdAt));
-  }, [currentNovelId, currentCfi, currentChapterHref, novels]);
+  }, [currentNovelId, currentChapterHref, novels]);
 
   const handleRemoveBookmark = useCallback((cfi: string) => {
     const bookmarkToRemove = bookmarks.find(b => b.cfi === cfi);

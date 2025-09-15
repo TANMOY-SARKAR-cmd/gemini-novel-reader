@@ -13,7 +13,7 @@ interface ReaderViewProps {
   onChapterChange: (href: string) => void;
   onTextReady: (text: string) => void;
   onLocationChange: (cfi: string) => void;
-  onAddBookmark: () => void;
+  onAddBookmark: (cfi: string) => void;
   onRemoveBookmark: (cfi: string) => void;
   bookmarks: Bookmark[];
   initialLocation: string | null;
@@ -60,7 +60,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
     if (isCurrentLocationBookmarked) {
         onRemoveBookmark(currentCfi);
     } else {
-        onAddBookmark();
+        onAddBookmark(currentCfi);
     }
   };
   
