@@ -12,6 +12,13 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
+      },
+      server: {
+        // Allow external scripts in development
+        headers: {
+          'Cross-Origin-Embedder-Policy': 'unsafe-none',
+          'Cross-Origin-Opener-Policy': 'unsafe-none'
+        }
       }
     };
 });

@@ -67,6 +67,68 @@ function App() {
 
   const [viewMode, setViewMode] = useState<'epub' | 'pdf'>('epub');
 
+  // All hooks must be defined before any conditional returns
+  const getNovelText = useCallback(async (novel: Novel): Promise<string> => {
+      if (!novel.file || novel.file.byteLength === 0) return "";
+      const book = ePub(novel.file);
+      await book.ready;
+      let fullText = '';
+      const processed = new Set();
+      for (const item of book.spine.items) {
+          if (processed.has(item.href)) continue;
+          try {
+            const section = await book.load(item.href);
+            const el = document.createElement('div');
+            el.innerHTML = await (section as any).text();
+            fullText += el.innerText + '\n\n';
+            processed.add(item.href);
+          } catch (e) {
+              console.warn(`Could not load section ${item.href}`, e);
+          }
+      }
+      book.destroy();
+      return fullText;
+  }, []);
+
+  const handleChapterChangeFromReader = useCallback((href: string) => {
+    if(currentNovelId) {
+      setCurrentChapterHref(href);
+      localStorage.setItem(`lastChapterHref_${currentNovelId}`, href);
+    }
+  }, [currentNovelId]);
+
+  const handleAddBookmark = useCallback((cfi: string) => {
+    const currentNovel = novels.find(n => n.id === currentNovelId);
+    if (!currentNovel || !cfi) return;
+
+    const currentChapter = currentNovel.toc?.find(item => item.href === currentChapterHref);
+    
+    const newBookmark: Bookmark = {
+        id: `${currentNovel.id}-${Date.now()}`,
+        novelId: currentNovel.id,
+        cfi: cfi,
+        label: currentChapter?.label.trim() ?? 'Bookmark',
+        createdAt: Date.now(),
+    };
+    dbAddBookmark(newBookmark);
+    setBookmarks(prev => [newBookmark, ...prev].sort((a,b) => b.createdAt - a.createdAt));
+  }, [currentNovelId, currentChapterHref, novels]);
+
+  const handleRemoveBookmark = useCallback((cfi: string) => {
+    const bookmarkToRemove = bookmarks.find(b => b.cfi === cfi);
+    if (bookmarkToRemove) {
+        dbDeleteBookmark(bookmarkToRemove.id);
+        setBookmarks(prev => prev.filter(b => b.id !== bookmarkToRemove.id));
+    }
+  }, [bookmarks]);
+  
+  const handleGoToBookmark = useCallback((cfi: string) => {
+      setViewMode('epub'); // Ensure we are in epub mode to show bookmark
+      setLocationToDisplay(cfi);
+  }, []);
+
+  const handleLocationDisplayed = useCallback(() => setLocationToDisplay(null), []);
+
   useEffect(() => {
     const storedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
     const initialTheme = storedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
@@ -172,7 +234,6 @@ function App() {
     loadNovelData();
   }, [currentNovelId, novels]); // Added `novels` dependency to re-check if novel is loaded
 
-
   useEffect(() => {
     if (currentNovelId) {
       const novelBookmarks = getBookmarksForNovel(currentNovelId);
@@ -181,28 +242,6 @@ function App() {
       setBookmarks([]);
     }
   }, [currentNovelId]);
-  
-  const getNovelText = useCallback(async (novel: Novel): Promise<string> => {
-      if (!novel.file || novel.file.byteLength === 0) return "";
-      const book = ePub(novel.file);
-      await book.ready;
-      let fullText = '';
-      const processed = new Set();
-      for (const item of book.spine.items) {
-          if (processed.has(item.href)) continue;
-          try {
-            const section = await book.load(item.href);
-            const el = document.createElement('div');
-            el.innerHTML = await (section as any).text();
-            fullText += el.innerText + '\n\n';
-            processed.add(item.href);
-          } catch (e) {
-              console.warn(`Could not load section ${item.href}`, e);
-          }
-      }
-      book.destroy();
-      return fullText;
-  }, []);
 
   useEffect(() => {
       const fetchNovelText = async () => {
@@ -217,7 +256,6 @@ function App() {
           fetchNovelText();
       }
   }, [currentNovelId, novels, getNovelText]);
-
 
   const toggleTheme = () => {
     setTheme(prevTheme => {
@@ -248,46 +286,10 @@ function App() {
       setIsSidebarOpen(false);
     }
   };
-  
-  const handleChapterChangeFromReader = useCallback((href: string) => {
-    if(currentNovelId) {
-      setCurrentChapterHref(href);
-      localStorage.setItem(`lastChapterHref_${currentNovelId}`, href);
-    }
-  }, [currentNovelId]);
-
-  const handleAddBookmark = useCallback((cfi: string) => {
-    const currentNovel = novels.find(n => n.id === currentNovelId);
-    if (!currentNovel || !cfi) return;
-
-    const currentChapter = currentNovel.toc?.find(item => item.href === currentChapterHref);
-    
-    const newBookmark: Bookmark = {
-        id: `${currentNovel.id}-${Date.now()}`,
-        novelId: currentNovel.id,
-        cfi: cfi,
-        label: currentChapter?.label.trim() ?? 'Bookmark',
-        createdAt: Date.now(),
-    };
-    dbAddBookmark(newBookmark);
-    setBookmarks(prev => [newBookmark, ...prev].sort((a,b) => b.createdAt - a.createdAt));
-  }, [currentNovelId, currentChapterHref, novels]);
-
-  const handleRemoveBookmark = useCallback((cfi: string) => {
-    const bookmarkToRemove = bookmarks.find(b => b.cfi === cfi);
-    if (bookmarkToRemove) {
-        dbDeleteBookmark(bookmarkToRemove.id);
-        setBookmarks(prev => prev.filter(b => b.id !== bookmarkToRemove.id));
-    }
-  }, [bookmarks]);
-  
-  const handleGoToBookmark = useCallback((cfi: string) => {
-      setViewMode('epub'); // Ensure we are in epub mode to show bookmark
-      setLocationToDisplay(cfi);
-  }, []);
 
   const currentNovel = novels.find(n => n.id === currentNovelId);
 
+  // Conditional rendering after all hooks have been defined
   if (isLoading) {
       return <div className="w-screen h-screen flex items-center justify-center"><LoadingSpinner /></div>;
   }
@@ -329,7 +331,7 @@ function App() {
             novel={currentNovel} 
             chapterHref={currentChapterHref} 
             initialLocation={locationToDisplay}
-            onLocationDisplayed={useCallback(() => setLocationToDisplay(null), [])}
+            onLocationDisplayed={handleLocationDisplayed}
             theme={theme} 
             viewMode={viewMode}
             onChapterChange={handleChapterChangeFromReader}
